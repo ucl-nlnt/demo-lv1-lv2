@@ -10,6 +10,9 @@ import json
 import ast
 from knetworking import DataBridgeServer_TCP
 from collections import deque
+import subprocess
+
+launch_demo_ttb = subprocess.Popen('python3 ~/demo-lv1-lv2/demo_ttb.py', stdout=subprocess.DEVNULL, shell=True)
 
 transcriber = pipeline("automatic-speech-recognition", model="openai/whisper-base.en")
 
