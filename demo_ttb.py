@@ -89,13 +89,7 @@ class AutoDataCollector(Node):
 
     def __init__(self, comm_on = True, sampler_on = True, debug = False):
 
-        super().__init__('AutoDataCollector_lv1_lv2')
-
-        if args.name == None:
-            self.user = input("Enter your name for logging purposes: ")
-        else:
-            self.user = args.name
-
+        super().__init__('ttb_demo')
         self.movement_publisher = self.create_publisher(Twist, '/cmd_vel',10)
         self.create_subscription(Odometry, 'odom', self.odometer_callback, qos_profile_sensor_data)  
         self.create_subscription(Twist,'cmd_vel', self.twist_callback, qos_profile_sensor_data)
@@ -109,7 +103,7 @@ class AutoDataCollector(Node):
         self.odometry_msg_data_pos = (None, None, None)
         self.odometry_msg = None
 
-        self.client = DataBridgeClient_TCP(destination_ip_address='localhost', destination_port=50000)
+        self.client = DataBridgeClient_TCP(destination_ip_address=args.ip, destination_port=50000)
 
         self.twist_timestamp = None
         self.last_twist_timestamp = None
