@@ -219,27 +219,38 @@ class AutoDataCollector(Node):
 
                 # [linear x: float, angular z: float, delta t: float, complete: bool or int]
                 
-                x, z, dt, is_complete = ast.literal_eval(self.client.receive_data().decode().strip()) # instructions
-                if is_complete: break
+                print('==============')
+
+                data = ast.literal_eval(self.client.receive_data().decode().strip()) # instructions
+                print('received', data)
+                x, z, dt, is_complete = data
+                if x > 0.2: x = 0.2
 
                 ins_start_pos = self.odometry_msg_data_pos
                 
+                print('start orientation:', quaternion_to_yaw(*quart_funcs.adjust_orientation_origin(normalizing_quat,self.odometry_msg_data)))
                 self.__publish_twist_message(x, z)
                 time.sleep(dt)
                 self.__publish_twist_message(0.0, 0.0)
                 time.sleep(0.5) # allow for deceleration
 
+                distance = compute_distance(self.odometry_msg_data_pos, ins_start_pos)
+                orientation = quaternion_to_yaw(*quart_funcs.adjust_orientation_origin(normalizing_quat,self.odometry_msg_data))
+                print('end orientation:', orientation)
+
                 return_data = str(
 
                     {
-                        'orientation': round(quart_funcs.adjust_orientation_origin(normalizing_quat,self.odometry_msg_data),precision),
-                        'distance_traveled': round(compute_distance(self.odometry_msg_data_pos, ins_start_pos),precision)
+                        'orientation': round(orientation,precision),
+                        'distance_traveled': round(distance,precision)
                     }
 
                 )
 
+                print('return data:', return_data)
+                print('\n')
                 self.client.send_data(return_data.encode())
-
+                if is_complete: print('##########################################################################################'); break
 
     def reset_distance_and_radians(self):
 
@@ -299,8 +310,6 @@ class AutoDataCollector(Node):
         self.movement_publisher.publish(data)
         
         self.twist_timestamp = time.time()
-        if self.last_twist_timestamp != None:
-            print("Twist time delay:",self.twist_timestamp - self.last_twist_timestamp)
         self.last_twist_timestamp = self.twist_timestamp
 
         return

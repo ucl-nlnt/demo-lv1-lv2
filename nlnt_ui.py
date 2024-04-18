@@ -33,6 +33,7 @@ def transcribe(audio):
     return transcriber({"sampling_rate": sr, "raw": y})["text"]
 
 def nlnt (vid_check, prompt, video, history="None", progress=gr.Progress()):
+
     progress(0, desc="Starting...")
 
     if vid_check == True:
@@ -40,52 +41,41 @@ def nlnt (vid_check, prompt, video, history="None", progress=gr.Progress()):
     else:
 
         server.send_data('START')
-
-        # Level 2 Model
-        x_dict = ast.literal_eval(main(prompt))
         
         history = deque([])
-
         state_number = 0
+        
+        x_dict = {"instruction complete" : "#ongoing"}
         while x_dict["instruction complete"] == "#ongoing":       # JSON bug here where it doesn't recognize dictionary 
             
-            #while "#ongoing" in x:
-            # send x to Turtlebot using TCP => Turtlebot churva
-            # send json string to Turtlebot
-            # send x_dict["movement message"]
-            # receive y from turtlebot using TCP
-            # x_dict["orientation"] = actual_orientation
-            # x_dict["distance to next point"] = actual_distance
-            # x_dict["execution length"] = actual_execution length
-            # send json string back and append to history
-            # {
-            #   "state number": "0x2", 
-            #   "orientation": 1.29, 
-            #   "distance to next point": 0.001, 
-            #   "execution length": 1.402, 
-            #   "movement message": (0.0, 0.2), 
-            #   "instruction complete": "#complete"
-            # }
-            
-            # x_dict is previous state;
+            if history != deque([]):
+                x = main(prompt, [i for i in history])
+            else:
+                x = main(prompt, "None")
+                
+            x_dict = ast.literal_eval(x)
 
-            lin_x, ang_z = x_dict['movement_message']
+            print('Predicted:', x_dict)
+            lin_x, ang_z = x_dict['movement message']
             dt = x_dict['execution length']
-            mess = str([lin_x, ang_z, dt, 0])
+            code = 1 if x_dict['instruction complete'] == '#complete' else 0
+
+            mess = str([lin_x, ang_z, dt, code])
 
             server.send_data(mess.encode())
             data = ast.literal_eval(server.receive_data().decode())
 
             x_dict['state number'] = hex(state_number)
             x_dict['orientation'] = data['orientation']
-            x_dict['distance to next point'] = data['distance_traveled']
+            #x_dict['distance to next point'] = data['distance_traveled']
 
             history.append(str(x_dict))
             if len(history) > 5:
                history.popleft()
+            
+            print(history[-1])
+            print('\n')
 
-            x = main(prompt, history)
-            x_dict = ast.literal_eval(x)
             state_number += 1
             
         return x
