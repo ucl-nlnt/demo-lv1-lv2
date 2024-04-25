@@ -43,8 +43,10 @@ def nlnt (vid_check, prompt, video, history="None", progress=gr.Progress()):
         return level3_model(prompt, video)
     else:
 
+        print('sending start')
         server.send_data('START')
-        
+        print('start sent')
+
         history = deque([])
         state_number = 0
         
@@ -67,6 +69,10 @@ def nlnt (vid_check, prompt, video, history="None", progress=gr.Progress()):
 
             server.send_data(mess.encode())
             data = ast.literal_eval(server.receive_data().decode())
+
+            if data['blocked']:
+               print('Obstacle detected.')
+               break
 
             x_dict['state number'] = hex(state_number)
             x_dict['orientation'] = data['orientation']
