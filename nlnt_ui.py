@@ -23,6 +23,39 @@ css = """
 .color_btn textarea  {background-color: #228B22; !important}
 """
 
+js = """
+function createGradioAnimation() {
+    var container = document.createElement('div');
+    container.id = 'gradio-animation';
+    container.style.fontSize = '2em';
+    container.style.fontWeight = 'bold';
+    container.style.textAlign = 'center';
+    container.style.marginBottom = '20px';
+
+    var text = 'Welcome to Gradio!';
+    for (var i = 0; i < text.length; i++) {
+        (function(i){
+            setTimeout(function(){
+                var letter = document.createElement('span');
+                letter.style.opacity = '0';
+                letter.style.transition = 'opacity 0.5s';
+                letter.innerText = text[i];
+
+                container.appendChild(letter);
+
+                setTimeout(function() {
+                    letter.style.opacity = '1';
+                }, 50);
+            }, i * 250);
+        })(i);
+    }
+
+    var gradioContainer = document.querySelector('.gradio-container');
+    gradioContainer.insertBefore(container, gradioContainer.firstChild);
+
+    return 'Animation created';
+}
+"""
 #print('Waiting for Turtlbot connection...')
 #ttb_script_path = os.path.join(os.getcwd(),"demo_ttb.py")
 #launch_demo_ttb = subprocess.Popen(f'python3 {ttb_script_path}', stdout=subprocess.DEVNULL, shell=True)
@@ -104,7 +137,9 @@ def show_vid (vid_check):
     else:
       return gr.update(visible=False)
 
-with gr.Blocks(theme=theme, css=css, title = "NLNT Demo") as demo:
+# js=
+with gr.Blocks(theme=theme, css=css, title = "NLNT Demo",js="metadata.js") as demo:
+    
     gr.Markdown(
     """
     # Natural Language Ninja Turtle
@@ -132,6 +167,19 @@ with gr.Blocks(theme=theme, css=css, title = "NLNT Demo") as demo:
         status = gr.Textbox(label = "Status", placeholder = "Please enter your prompt.")
         #history = None
         run_nlnt = ttbt_btn.click(fn=nlnt, inputs=[vid_check, prompt, video], outputs=status)
+    with gr.Row():
+        gr.HTML("""
+        <div style='height: 30px; width: 100%;'>
+            <div style='display:flex;justify-content:space-around;'>
+                <div>
+                    <span style='font-weight:bold;'>Total Distance Traveled:</span> <span id="total-dist"></span>
+                </div>
+                <div>
+                    <span style='font-weight:bold;'>Total Degrees Rotated:</span> <span id="total-degs"></span>
+                </div>
+            </div>
+        </div>
+        """)
 
 
 demo.launch()
