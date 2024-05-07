@@ -43,8 +43,20 @@ theme = gr.themes.Monochrome(
     shadow_spread_dark='none'
 )
 
+# <link href="https://fonts.googleapis.com/css2?family=Jersey+25+Charted&display=swap" rel="stylesheet">
+# font-family: "Jersey 25 Charted", sans-serif;
+
 css = """
-.color_btn textarea  {background-color: #228B22; !important}
+h1 {
+    text-align: center;
+    font-size: 3vw;
+    display:block;
+}
+p {
+    text-align: center;
+    font-size: 1vw;
+    display:block;
+}
 """
 
 #print('Waiting for Turtlbot connection...')
@@ -198,12 +210,12 @@ with gr.Blocks(theme=theme, css=css, title = "NLNT Demo",js="metadata.js") as de
         prompt = gr.Textbox(label = "Instruction", placeholder = "move 1.5 meters forward", interactive = True)
     with gr.Row():
         clr_audio = gr.ClearButton(value = "clear audio", components = [audio])
-        transcribe_btn = gr.Button(value = "Transcribe", elem_classes = "color_btn")
+        transcribe_btn = gr.Button(value = "Transcribe")
         clr_text = gr.ClearButton(value = "clear text", components = [audio, prompt])
         transcription = transcribe_btn.click(fn=transcribe, inputs=audio, outputs=prompt)
         #transcription = gr.Interface(transcribe, audio, prompt)
     with gr.Row():
-        ttbt_btn = gr.Button(value = "Run Instruction", elem_classes = "color_btn")
+        ttbt_btn = gr.Button(value = "Run Instruction")
     with gr.Row():
         video = gr.Image(sources=["webcam"], streaming=True, visible=False)
         ckbx = vid_check.select(fn = show_vid, inputs = vid_check, outputs = video)
