@@ -54,7 +54,7 @@ h1 {
 }
 p {
     text-align: center;
-    font-size: 1vw;
+    font-size: 1.2vw;
     display:block;
 }
 """
