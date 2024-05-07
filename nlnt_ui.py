@@ -147,42 +147,9 @@ def total_distance():
     #return time.ctime()
 
 def total_rotation():
-    import time
+   
     return time.ctime()
 
-js = """
-function createGradioAnimation() {
-    var container = document.createElement('div');
-    container.id = 'gradio-animation';
-    container.style.fontSize = '2em';
-    container.style.fontWeight = 'bold';
-    container.style.textAlign = 'center';
-    container.style.marginBottom = '20px';
-
-    var text = 'Natural Language Ninja Turtle';
-    for (var i = 0; i < text.length; i++) {
-        (function(i){
-            setTimeout(function(){
-                var letter = document.createElement('span');
-                letter.style.opacity = '0';
-                letter.style.transition = 'opacity 0.5s';
-                letter.innerText = text[i];
-
-                container.appendChild(letter);
-
-                setTimeout(function() {
-                    letter.style.opacity = '1';
-                }, 50);
-            }, i * 250);
-        })(i);
-    }
-
-    var gradioContainer = document.querySelector('.gradio-container');
-    gradioContainer.insertBefore(container, gradioContainer.firstChild);
-
-    return 'Animation created';
-}
-"""
 
 with gr.Blocks(theme=theme, css=css, title = "NLNT Demo",js="metadata.js") as demo:
     with gr.Row():
@@ -221,10 +188,10 @@ with gr.Blocks(theme=theme, css=css, title = "NLNT Demo",js="metadata.js") as de
         <div style='height: 30px; width: 100%;'>
             <div style='display:flex;justify-content:space-around;'>
                 <div>
-                    <span style='font-weight:bold;'>Total Distance Traveled:</span> <span id="total-dist"></span>
+                    <span style='font-weight:bold;'>Total Distance Traveled:</span> <span id="total-dist">0</span>
                 </div>
                 <div>
-                    <span style='font-weight:bold;'>Total Degrees Rotated:</span> <span id="total-degs"></span>
+                    <span style='font-weight:bold;'>Total Degrees Rotated:</span> <span id="total-degs">0</span>
                 </div>
             </div>
         </div>
@@ -232,3 +199,19 @@ with gr.Blocks(theme=theme, css=css, title = "NLNT Demo",js="metadata.js") as de
 
 
 demo.launch()
+
+### add webserver to host data from turtlebot
+from fastapi import FastAPI
+webserver = FastAPI()
+
+@webserver.get("/")
+def read_root():
+    return {"Hello": "World"}
+
+
+@webserver.get("/metadata")
+def read_metadata():
+    # TODO, format the data from server = DataBridgeServer_TCP() to get the different metadata
+    total_distance_traveled = 0
+    total_degrees_rotated = 0
+    return {"total_distance_traveled": total_distance_traveled, "total_degrees_rotated": total_degrees_rotated}
