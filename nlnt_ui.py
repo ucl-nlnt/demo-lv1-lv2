@@ -11,6 +11,7 @@ from knetworking import DataBridgeServer_TCP
 from collections import deque
 import subprocess
 import os
+import time
 
 transcriber = pipeline("automatic-speech-recognition", model="openai/whisper-base.en")
 
@@ -33,7 +34,13 @@ theme = gr.themes.Monochrome(
     button_secondary_text_color='*neutral_50',
     button_secondary_text_color_dark='*neutral_800',
     button_secondary_text_color_hover='*button_secondary_border_color_hover',
-    button_secondary_text_color_hover_dark='*neutral_50'
+    button_secondary_text_color_hover_dark='*neutral_50',
+
+    shadow_drop='none',
+    shadow_drop_lg='none',
+    shadow_inset='none',
+    shadow_spread='none',
+    shadow_spread_dark='none'
 )
 
 css = """
@@ -41,8 +48,8 @@ css = """
 """
 
 #print('Waiting for Turtlbot connection...')
-#ttb_script_path = os.path.join(os.getcwd(),"demo_ttb.py")
-#launch_demo_ttb = subprocess.Popen(f'python3 {ttb_script_path}', stdout=subprocess.DEVNULL, shell=True)
+ttb_script_path = os.path.join(os.getcwd(),"demo_ttb.py")
+launch_demo_ttb = subprocess.Popen(f'python3 {ttb_script_path}', stdout=subprocess.DEVNULL, shell=True)
 server = DataBridgeServer_TCP()
 
 def transcribe(audio):
@@ -129,8 +136,54 @@ def show_vid (vid_check):
       return gr.update(visible=True)
     else:
       return gr.update(visible=False)
+    
+def total_distance():
+    counter = 0
 
-# js=
+    while True:
+        yield str(counter)
+        counter += 1
+    
+    #return time.ctime()
+
+def total_rotation():
+    import time
+    return time.ctime()
+
+js = """
+function createGradioAnimation() {
+    var container = document.createElement('div');
+    container.id = 'gradio-animation';
+    container.style.fontSize = '2em';
+    container.style.fontWeight = 'bold';
+    container.style.textAlign = 'center';
+    container.style.marginBottom = '20px';
+
+    var text = 'Natural Language Ninja Turtle';
+    for (var i = 0; i < text.length; i++) {
+        (function(i){
+            setTimeout(function(){
+                var letter = document.createElement('span');
+                letter.style.opacity = '0';
+                letter.style.transition = 'opacity 0.5s';
+                letter.innerText = text[i];
+
+                container.appendChild(letter);
+
+                setTimeout(function() {
+                    letter.style.opacity = '1';
+                }, 50);
+            }, i * 250);
+        })(i);
+    }
+
+    var gradioContainer = document.querySelector('.gradio-container');
+    gradioContainer.insertBefore(container, gradioContainer.firstChild);
+
+    return 'Animation created';
+}
+"""
+
 with gr.Blocks(theme=theme, css=css, title = "NLNT Demo",js="metadata.js") as demo:
     with gr.Row():
         gr.Markdown(
@@ -160,6 +213,9 @@ with gr.Blocks(theme=theme, css=css, title = "NLNT Demo",js="metadata.js") as de
             status = gr.Textbox(label = "Status", placeholder = "Please enter your prompt.")
             #history = None
             run_nlnt = ttbt_btn.click(fn=nlnt, inputs=[vid_check, prompt, video], outputs=status)
+    #with gr.Row():
+    #    total_dist = gr.Textbox(value = next(total_distance()), label = "Total Distance Traveled", interactive=False)
+    #    total_rot = gr.Textbox(value = total_rotation(), label = "Total Degrees Rotated", interactive=False, every=0.5)
     with gr.Row():
         gr.HTML("""
         <div style='height: 30px; width: 100%;'>
