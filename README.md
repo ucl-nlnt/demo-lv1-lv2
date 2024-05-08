@@ -5,7 +5,7 @@
 ### Terminal Commands
 1. On Gradio PC
 ```bash
-fastpi dev <file.py>
+fastapi dev nlnt_ui.py
 ``` 
 
 2. On Turtlebot
