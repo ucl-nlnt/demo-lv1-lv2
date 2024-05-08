@@ -64,7 +64,7 @@ p {
 # ttb_script_path = os.path.join(os.getcwd(),"demo_ttb.py")
 # launch_demo_ttb = subprocess.Popen(f'python3 {ttb_script_path}', stdout=subprocess.DEVNULL, shell=True)
 server = DataBridgeServer_TCP()
-
+print(server)
 def transcribe(audio):
     sr, y = audio
     y = y.astype(np.float32)
@@ -165,14 +165,15 @@ def total_rotation():
 
 data_buffer = []
 
-def super_json_listener(self):
+def super_json_listener():
 
         t = time.time() + 1.0
         x = 0
+        gathering_data = True
 
         while True:
             
-            if not self.gathering_data: time.sleep(0.007); continue
+            if not gathering_data: time.sleep(0.007); continue
 
             if time.time() > t:  # used to calculate framerate for debug purposes
                 t = time.time() + 1.0
