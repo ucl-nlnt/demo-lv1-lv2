@@ -86,16 +86,6 @@ def level2_model(prompt, history="None", progress=gr.Progress()):
     progress(0, desc="Starting...")
     server.send_data('START')
     
-<<<<<<< HEAD
-=======
-    # new output format
-    
-    x = main(prompt, "None")                          # initial prompt ; returns whether prompt is possible or not
-    
-    # if impossible return: "Action impossible. Please try again."
-    # else go to while loop
-    
->>>>>>> 63fb84da483843909b50516af98466ff6e3530e9
     history = deque([])
     state_number = 0
         
