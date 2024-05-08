@@ -5,7 +5,7 @@
 import gradio as gr
 from transformers import pipeline
 import numpy as np
-from inference_gradio import main
+from inference_gradio import inference
 import ast
 from knetworking import DataBridgeServer_TCP
 from collections import deque
