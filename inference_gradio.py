@@ -5,7 +5,7 @@ import argparse
 import time
 
 
-def main(prompt):
+def inference(prompt):
     #print(chalk.green("UCL NLNT Level 1 and 2 Inference Terminal"))
 
     url = 'http://10.158.18.253:11000/send-prompt'
@@ -67,4 +67,4 @@ if __name__ == "__main__":
     parser.add_argument('--prompt', type=str,
                         help='Your prompt', required=False)
     args = parser.parse_args()
-    main(args.prompt, "None")
+    inference(args.prompt, "None")
