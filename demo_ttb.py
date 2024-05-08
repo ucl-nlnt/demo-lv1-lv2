@@ -11,6 +11,7 @@ from nav_msgs.msg import Odometry
 from rclpy.qos import qos_profile_sensor_data
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import Imu
+from sensor_msgs.msg import LaserScan
 import numpy as np
 from copy import deepcopy
 #from prompt_randomizer import prompt_randomizer
@@ -91,12 +92,14 @@ class AutoDataCollector(Node):
 
         super().__init__('ttb_demo')
         self.movement_publisher = self.create_publisher(Twist, '/cmd_vel',10)
+        self.create_subscription(LaserScan, 'scan', self.laserscan_callback, qos_profile_sensor_data)
         self.create_subscription(Odometry, 'odom', self.odometer_callback, qos_profile_sensor_data)  
         self.create_subscription(Twist,'cmd_vel', self.twist_callback, qos_profile_sensor_data)
         self.create_subscription(Imu,'imu', self.imu_callback, qos_profile_sensor_data) # IMU data doesn't seem to be useful currently // Gab
 
         self.starting_odometry_set = False
         # class-wide variables to be used
+        self.direction = None
         self.distance_traveled = 0.0
         self.radians_rotated = 0.0
         self.odometry_msg_data = (None, None, None, None)
@@ -109,6 +112,7 @@ class AutoDataCollector(Node):
         self.last_twist_timestamp = None
         self.collect_data = False
         self.data_frame_buffer = []
+        self.laserscan_msg = None
 
         # data messages init
         self.super_json = None
@@ -116,6 +120,10 @@ class AutoDataCollector(Node):
         self.imu_msg = None
         self.twist_msg = None
         self.sampling_start = False
+        self.linear_x = 0.0
+        self.angular_z = 0.0
+
+        self.front_is_blocked = False
 
         # multithreading stuff
         if sampler_on:
@@ -129,6 +137,18 @@ class AutoDataCollector(Node):
             self.controller = threading.Thread(target=self.communicator)      # receives instructions from controller
             self.controller.daemon = True
             self.controller.start()
+
+        # soft barrier checker
+        self.barrier_thread = threading.Thread(target=self.soft_barrier)
+        self.barrier_thread.start()
+
+        # asynchronously handles movement
+        self.movement_handler_thread = threading.Thread(target=self.movement_server)
+        self.movement_handler_thread.start()
+
+    def laserscan_callback(self, msg):
+        if msg == None: return
+        self.laserscan_msg = msg
 
     def twist_callback(self,msg):
         if msg == None: return
@@ -146,8 +166,6 @@ class AutoDataCollector(Node):
         while self.odometry_msg_data == None: time.sleep(0.1)
         while self.odometry_msg_data_pos == None: time.sleep(0.1)
         while self.odometry_msg == None: time.sleep(0.1)
-        
-        self.__publish_twist_message(0.0, 0.0)
 
         twist_msg_jsonized = { # default
                     "linear":(0.0, 0.0, 0.0),
@@ -203,7 +221,8 @@ class AutoDataCollector(Node):
     def communicator(self):
         
         precision = 3
-        while self.odometry_msg == None: time.sleep(0.1)
+        while self.odometry_msg == None: print('waiting for odometry msg'); time.sleep(0.1)
+        while self.odometry_msg_data == None: print('waiting for odometry msg data'); time.sleep(0.1)
 
         while True:
             
@@ -214,43 +233,120 @@ class AutoDataCollector(Node):
 
             if lock != 'START':
                 continue
+            
+            self.direction = None
+
+            total_instruction_distance = 0.0
+            total_rotation_angular_distance = 0.0
 
             while True:
 
                 # [linear x: float, angular z: float, delta t: float, complete: bool or int]
-                
+                ins_start_pos = self.odometry_msg_data_pos
                 print('==============')
-
-                data = ast.literal_eval(self.client.receive_data().decode().strip()) # instructions
-                print('received', data)
+                
+                instruction = self.client.receive_data().decode().strip()
+                print('received:', instruction)
+                data = ast.literal_eval(instruction) # instructions
+                
                 x, z, dt, is_complete = data
+                t = time.time()
                 if x > 0.2: x = 0.2
 
-                ins_start_pos = self.odometry_msg_data_pos
+                ins_start_orientation = quart_funcs.adjust_orientation_origin(normalizing_quat,self.odometry_msg_data)
                 
-                print('start orientation:', quaternion_to_yaw(*quart_funcs.adjust_orientation_origin(normalizing_quat,self.odometry_msg_data)))
-                self.__publish_twist_message(x, z)
+                last_direction = None
+                if z == 0.0:
+
+                    self.direction = 'forward'
+                    last_direction = 'forward'
+                    self.linear_x = x
+
+                if x == 0.0:
+
+                    self.direction = 'left' if z > 0.0 else 'right'
+                    last_direction = 'left' if z > 0.0 else 'right'
+                    self.angular_z = z
+                    
                 time.sleep(dt)
-                self.__publish_twist_message(0.0, 0.0)
+                print('Delta t done.', dt, round(time.time() - t,3))
+                self.direction = None
+
                 time.sleep(0.5) # allow for deceleration
 
                 distance = compute_distance(self.odometry_msg_data_pos, ins_start_pos)
-                orientation = quaternion_to_yaw(*quart_funcs.adjust_orientation_origin(normalizing_quat,self.odometry_msg_data))
-                print('end orientation:', orientation)
-
+                ins_end_orientation = quart_funcs.adjust_orientation_origin(normalizing_quat,self.odometry_msg_data)
+                print("Blocked:",self.front_is_blocked, '|',self.direction)
                 return_data = str(
 
                     {
-                        'orientation': round(orientation,precision),
-                        'distance_traveled': round(distance,precision)
+                        'orientation': round(quaternion_to_yaw(*ins_end_orientation),precision),
+                        'distance_traveled': round(distance,precision),
+                        'blocked' : 1 if self.front_is_blocked and last_direction == 'forward' else 0
                     }
 
                 )
-
+                
+                delta_yaw = yaw_difference(quaternion1=ins_start_orientation, quaternion2=ins_end_orientation)
+                total_instruction_distance += distance
+                total_rotation_angular_distance += delta_yaw
+                print('Current iteration distance:', round(distance,3), "meters.")
+                print(f'Current iteration angular distance: {round(delta_yaw / math.pi * 180,3)} degrees | {round(delta_yaw,3)} radians.') 
+                print('Total distance traveled:', round(total_instruction_distance,3))
+                print(f'Total orientation difference: {round(total_rotation_angular_distance / math.pi * 180,3)} degrees | {round(total_rotation_angular_distance,3)} radians.')
                 print('return data:', return_data)
                 print('\n')
                 self.client.send_data(return_data.encode())
                 if is_complete: print('##########################################################################################'); break
+
+    def soft_barrier(self):
+
+        while self.laserscan_msg == None: time.sleep(0.1) # wait for lidar scanner to wake up
+
+        max_value = self.laserscan_msg.range_max
+        min_value = self.laserscan_msg.range_min
+
+        while True:
+
+            scans = deepcopy(self.laserscan_msg.ranges) # prevent race conditions
+            
+            # i = degree
+            # val = depth or distance
+            
+            for i, val in enumerate(scans): # clip too small and too large values
+
+                if (i > 45 and i < 314): 
+                    continue 
+                
+                if (val < min_value and val != 0.0):
+                    scans[i] = min_value
+
+                if (val > max_value): 
+                    scans[i] = max_value
+
+            degrees_blocked = 0
+#            print('==========================')
+
+            for i, val in enumerate(scans):
+
+                if (i > 45 and i < 314): 
+                    continue 
+
+                if val < 0.3 and val != 0.0:
+
+                    degrees_blocked += 1
+#                    print(i, val)
+
+                    if degrees_blocked >= 5:
+
+                        self.front_is_blocked = True
+                        break # no need to iterate through other values
+
+            if degrees_blocked < 5:
+                self.front_is_blocked = False
+
+            time.sleep(0.09) # slightly faster than nyquist frequency of lidar, which runs at a period of t = 0.2 seconds
+
 
     def reset_distance_and_radians(self):
 
@@ -263,12 +359,7 @@ class AutoDataCollector(Node):
         
         if not self.starting_odometry_set: 
             self.starting_odometry_set = True
-        else:
-            q = self.odometry_msg.pose.pose.position
-            x, y, z = q.x, q.y, q.z # save the values before proceeding
-            q = self.odometry_msg.pose.pose.orientation
-            quart = (q.x,q.y,q.z,q.w)
-
+        
         self.odometry_msg = msg
         self.odometry_msg_data = (
             msg.pose.pose.orientation.x,
@@ -282,25 +373,66 @@ class AutoDataCollector(Node):
             msg.pose.pose.position.z
         )
 
-        try:
-
-            q = self.odometry_msg.pose.pose.position
-            x1, y1, z1 = q.x, q.y, q.z # save the values before proceeding
-            q = self.odometry_msg.pose.pose.orientation
-            quart2 = (q.x,q.y,q.z,q.w)
-            self.distance_traveled += math.sqrt((x1-x)**2 + (y1-y)**2 + (z1-z)**2)
-            self.radians_rotated += round(abs(yaw_difference(quart2, quart)),4)
-            # print((round(self.distance_traveled,2),round(self.radians_rotated * 180 / math.pi,2)))
-
-        except Exception as e:
-            print("Error encountered on odometer callback:")
-            print(e)
-            pass
-
     def print_log(self, mess:str):
 
         print(f"[AutoDataCollector: {time.ctime()}] " + mess)
 
+    
+    def movement_server(self):
+
+        data = Twist()
+        while True:
+
+            if self.direction == None:
+                time.sleep(0.05)
+                continue
+
+            elif self.direction == 'forward':
+
+                if self.front_is_blocked:
+
+                    print('Cannot move forward! Front is blocked.')
+                    time.sleep(0.5)
+                    continue
+
+                starting_odometry = self.odometry_msg_data
+                correctionary_angular_z = 0.0
+                max_angular_z = 1.2
+
+                while self.direction == 'forward':
+
+                    yaw_diff = yaw_difference(quaternion2=self.odometry_msg_data, quaternion1=starting_odometry)
+                    correctionary_angular_z = -yaw_diff / 0.1
+                    correctionary_angular_z = max(-max_angular_z, min(max_angular_z, correctionary_angular_z))
+                    data.linear.x = self.linear_x
+                    data.angular.z = correctionary_angular_z
+
+                    if self.front_is_blocked:
+                        
+                        print("Cannot move forward! Front is blocked.")
+                        break
+                    
+                    self.movement_publisher.publish(data)
+                    time.sleep(0.01)
+
+                data.linear.x = 0.0
+                data.angular.z = 0.0
+                self.movement_publisher.publish(data) # deceleration
+
+            elif self.direction == 'left' or self.direction == 'right':
+
+                data.linear.x = 0.0
+                while self.direction == 'left' or self.direction == 'right':
+
+                    data.angular.z = self.angular_z
+                    self.movement_publisher.publish(data)
+                    time.sleep(0.1)
+
+                data.linear.x = 0.0
+                data.angular.z = 0.0
+                self.movement_publisher.publish(data) # deceleration
+
+    """ # Legacy code
     def __publish_twist_message(self, linear_x, angular_z):
 
 
@@ -414,6 +546,7 @@ class AutoDataCollector(Node):
         else: # delta < 0
 
             self.rotate(abs(delta), "right")
+    """
 
 def main(args=None, n_args=args):
 

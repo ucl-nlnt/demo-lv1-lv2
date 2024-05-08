@@ -32,5 +32,6 @@ def adjust_orientation_origin(inverse_reference_quart: list, quart: list):
     return multiply_quarternions(inverse_reference_quart, quart)
 
 def adjust_position_origin(ref_pose, pose):
-
+    print('ref:', ref_pose)
+    print('cur:', pose)
     return [pose[i] - ref_pose[i] for i in range(3)]
