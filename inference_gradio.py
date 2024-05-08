@@ -5,10 +5,10 @@ import argparse
 import time
 
 
-def main(prompt, history="None"):
+def main(prompt):
     #print(chalk.green("UCL NLNT Level 1 and 2 Inference Terminal"))
 
-    url = 'http://10.158.18.253:8000/send-prompt'
+    url = 'http://10.158.18.253:11000/send-prompt'
     # url = 'http://localhost:8000/send-prompt'
 
     # supply username/prompt if they are not provided
@@ -18,6 +18,7 @@ def main(prompt, history="None"):
     if prompt is None:
         prompt = input(chalk.yellow("Enter your prompt: "))
 
+'''
     # TODO: format prompt
 
     if history == "None":
@@ -28,7 +29,7 @@ def main(prompt, history="None"):
     print('================================================')
     print(prompt)
     print('================================================')
-    
+''' 
     headers = {'Content-Type': 'application/json'}
     data = {'content': prompt}
 
@@ -44,12 +45,13 @@ def main(prompt, history="None"):
         json_object = response.json()
         json_formatted_str = json.dumps(json_object, indent=2)
 
-        json_start = json_formatted_str.rfind('{')
-        json_end = json_formatted_str.rfind('</s>') - 1
 
-        to_return = json_formatted_str[json_start:json_end].replace("'", '"').strip()
+        #json_start = json_formatted_str.rfind('{')
+        #json_end = json_formatted_str.rfind('</s>') - 1
+
+        #to_return = json_formatted_str[json_start:json_end].replace("'", '"').strip()
         
-        return to_return
+        return json_formatted_str
     
     except requests.RequestException as e:
         print("Error:", e)
