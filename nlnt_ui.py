@@ -12,6 +12,7 @@ from collections import deque
 import subprocess
 import os
 import time
+import json
 
 transcriber = pipeline("automatic-speech-recognition", model="openai/whisper-base.en")
 
@@ -59,9 +60,9 @@ p {
 }
 """
 
-#print('Waiting for Turtlbot connection...')
-ttb_script_path = os.path.join(os.getcwd(),"demo_ttb.py")
-launch_demo_ttb = subprocess.Popen(f'python3 {ttb_script_path}', stdout=subprocess.DEVNULL, shell=True)
+# print('Waiting for Turtlbot connection...')
+# ttb_script_path = os.path.join(os.getcwd(),"demo_ttb.py")
+# launch_demo_ttb = subprocess.Popen(f'python3 {ttb_script_path}', stdout=subprocess.DEVNULL, shell=True)
 server = DataBridgeServer_TCP()
 
 def transcribe(audio):
@@ -162,6 +163,31 @@ def total_rotation():
    
     return time.ctime()
 
+data_buffer = []
+
+def super_json_listener(self):
+
+        t = time.time() + 1.0
+        x = 0
+
+        while True:
+            
+            if not self.gathering_data: time.sleep(0.007); continue
+
+            if time.time() > t:  # used to calculate framerate for debug purposes
+                t = time.time() + 1.0
+                x = 0
+            x += 1
+
+            data = json.loads(server.receive_data().decode())
+            if data_buffer == None: print("WARNING: data buffer is still None type."); continue
+
+            
+            data_buffer.append(data)
+
+import threading
+data_listener_thread = threading.Thread(target=super_json_listener)
+data_listener_thread.start()
 
 with gr.Blocks(theme=theme, css=css, title = "NLNT Demo",js="metadata.js") as demo:
     with gr.Row():
@@ -171,14 +197,14 @@ with gr.Blocks(theme=theme, css=css, title = "NLNT Demo",js="metadata.js") as de
         A Natural Language to ROS2 Translator for the Turtlebot V3 Burger
         """)
     with gr.Row():
-        vid_check = gr.Checkbox(label = "connect live video")
+        vid_check = gr.Checkbox(label = "Connect Live Video")
     with gr.Row(equal_height=True):
         audio = gr.Audio(sources=["microphone"])
         prompt = gr.Textbox(label = "Instruction", placeholder = "move 1.5 meters forward", interactive = True)
     with gr.Row():
-        clr_audio = gr.ClearButton(value = "clear audio", components = [audio])
+        clr_audio = gr.ClearButton(value = "Clear Audio", components = [audio])
         transcribe_btn = gr.Button(value = "Transcribe")
-        clr_text = gr.ClearButton(value = "clear text", components = [audio, prompt])
+        clr_text = gr.ClearButton(value = "Clear Text", components = [audio, prompt])
         transcription = transcribe_btn.click(fn=transcribe, inputs=audio, outputs=prompt)
         #transcription = gr.Interface(transcribe, audio, prompt)
     with gr.Row():
@@ -210,13 +236,15 @@ with gr.Blocks(theme=theme, css=css, title = "NLNT Demo",js="metadata.js") as de
         """)
 
 
-demo.launch()
 
 ### add webserver to host data from turtlebot
 from fastapi import FastAPI
-webserver = FastAPI()
+from random import randrange
 
-@webserver.get("/")
+webserver = FastAPI()
+print("launching webserver")
+
+@webserver.get("/hello")
 def read_root():
     return {"Hello": "World"}
 
@@ -224,6 +252,8 @@ def read_root():
 @webserver.get("/metadata")
 def read_metadata():
     # TODO, format the data from server = DataBridgeServer_TCP() to get the different metadata
-    total_distance_traveled = 0
-    total_degrees_rotated = 0
+    total_distance_traveled = randrange(20, 50)
+    total_degrees_rotated = randrange(-10,10)
     return {"total_distance_traveled": total_distance_traveled, "total_degrees_rotated": total_degrees_rotated}
+
+app = gr.mount_gradio_app(webserver, demo, path="/")
