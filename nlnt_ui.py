@@ -77,40 +77,87 @@ def nlnt (vid_check, prompt, video, history="None", progress=gr.Progress()):
     progress(0, desc="Starting...")
 
     if vid_check == True:
-        return level3_model(prompt, video)
+        #return level3_model(prompt, video)
+        return level2_model(prompt, history, progress=gr.Progress())                            # FOR NOW !!! Change later !!!
     else:
         return level2_model(prompt, history, progress=gr.Progress())
 
-def level2_model(prompt, history="None", progress=gr.Progress()):
+def level2_model(user_instruction, progress=gr.Progress()):
     
-    progress(0, desc="Starting...")
-    server.send_data('START')
-    
-    history = deque([])
-    state_number = 0
-        
-    x_dict = {"instruction complete" : "#ongoing"}
-    i = 0
+  progress(0, desc="Starting...")
+  server.send_data('START')
+  first_run = True
+  history = deque([])
+  state_number = 0
 
-    while x_dict["instruction complete"] == "#ongoing":
-        if history != deque([]):
-            x = main(prompt, [i for i in history])                  # send prompt to lambda server
+  while True:
+    if first_run:
+      # First Iteration
+      prompt = f"""Your task is to pilot a Turtlebot3 and predict the next state give a history sequence. First, predict whether or not the task is doable.
+        The prompt is: <prompt> <PROMPT> </prompt>. Add delimeters to outline your solution and your answer, "<deconstruction_start>" and "<deconstruction_end>" for your step-by-step breakdown of the natural language prompt, and "<possibility_start>" and "<possibility_end>" to delineate your possibility answer and make it easy to parse in Python.
+
+        Information about the task will be given in JSONs, and it is expected that you will also give your answers in a JSON format.<|end|>"""
+      prompt.replace("<PROMPT>", user_instruction)
+      
+      predicted = inference(prompt)
+      
+      # Check whether or not instruction is possible
+      possible_start = predicted.rfind('<possibility_start>')
+      possible_end = predicted.rfind('<possibility_end>') - 1
+
+      possible = predicted[possible_start:possible_end].strip()
+
+      if possible:
+        # Instruction is possible
+        prompt += predicted                                                     # add previous prediction to prompt
+
+        # Get Expected Number of States
+        stepnums_start = predicted.rfind('Thus, it will take ')
+        stepnums_end = predicted.rfind(' states to complete.') - 1
+
+        stepnums = predicted[stepnums_start:stepnums_end]
+
+        first_run = False                                                       # first run done!
+
+      else:
+        # Instruction is impossible to accomplish
+        return "Task deemed impossible. Waiting for your next instruction."     # stop inferencing here!
+
+    else:
+      # Subsequent Inferences once Task is deemed possible
+      x_dict = {"instruction complete" : "#ongoing"}
+
+      while x_dict["instruction complete"] == "#ongoing":
+        if state_number != stepnums:
+            status = state_number/stepnums
         else:
-            x = main(prompt, "None")                                # send prompt to lambda server
+            status = 0.99
 
-        x_dict = ast.literal_eval(x)
+        if history != deque([]):
+            new_prompt = prompt + f"""The current state history is: {[i for i in history]}. Predict the next state. Use "<answer_start>" and "<answer_end>" to delineate the answer.<|end|>"""
+        else:
+            new_prompt = prompt + f"""The current state history is: "None". Predict the next state. Use "<answer_start>" and "<answer_end>" to delineate the answer.<|end|>"""
 
+        # Predict the next state
+        predicted = inference(new_prompt)
+
+        # Format the response to make life easier
+        next_state_start = predicted.rfind("<answer_start>")
+        next_state_end = predicted.rfind("<answer_end>") - 1
+
+        next_state = predicted[next_state_start:next_state_end].strip()
+
+        print(next_state)
+
+      
+        x_dict = ast.literal_eval(next_state)
+
+        # Send predicted info to Turtlebot
         print('Predicted:', x_dict)
         lin_x, ang_z = x_dict['movement message']
         dt = x_dict['execution length']
         code = 1 if x_dict['instruction complete'] == '#complete' else 0
-        expected_states = x_dict['expected number of states']               # TODO: double chack with actual output
-
-        if i != expected_states:
-            i += 1
-            status = i/expected_states
-        else:
-            status = 0.99
+        expected_states = x_dict['expected number of states']               # TODO: double check with actual output
 
         progress(status, desc=f'Ongoing... Next Action: ({str(lin_x)}, {str(ang_z)}, {str(dt)})')
 
@@ -137,6 +184,7 @@ def level2_model(prompt, history="None", progress=gr.Progress()):
             
         print(history[-1])
         print('\n')
+        
 
         state_number += 1
             
@@ -146,6 +194,9 @@ def level2_model(prompt, history="None", progress=gr.Progress()):
 def level3_model (prompt, video):
     return "level 3: " + prompt
 
+#def inference(prompt):
+    # should send prompt to the model
+    
 def show_vid (vid_check):
     if vid_check:
       return gr.update(visible=True)
