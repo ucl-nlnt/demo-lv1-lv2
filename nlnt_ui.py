@@ -82,15 +82,9 @@ def nlnt (vid_check, prompt, video, history="None", progress=gr.Progress()):
         return level2_model(prompt, history, progress=gr.Progress())
 
 def level2_model(prompt, history="None", progress=gr.Progress()):
+    
     progress(0, desc="Starting...")
     server.send_data('START')
-    
-    # new output format
-    
-    x = main(prompt, "None")                          # initial prompt ; returns whether prompt is possible or not
-    
-    # if impossible return: "Action impossible. Please try again."
-    # else go to while loop
     
     history = deque([])
     state_number = 0
@@ -127,7 +121,15 @@ def level2_model(prompt, history="None", progress=gr.Progress()):
 
         x_dict['state number'] = hex(state_number)
         x_dict['orientation'] = data['orientation']
-        #x_dict['distance to next point'] = data['distance_traveled']
+
+        if data['blocked']:
+
+            print('============= [WARN] =============')
+            print('block received')
+            print('============= [WARN] =============')
+            server.send_data(str([0.0, 0.0, 0.0, 1]))
+            x_dict['instruction complete'] = '#complete' # finish command
+            break
 
         history.append(str(x_dict))
         if len(history) > 5:
