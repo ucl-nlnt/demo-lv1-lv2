@@ -19,14 +19,14 @@ theme = gr.themes.Default(primary_hue= gr.themes.colors.emerald, secondary_hue=g
     button_primary_background_fill_hover="*primary_200",
 )
 
-#print('Waiting for Turtlbot connection...')
-server = DataBridgeServer_TCP()
-#ttb_script_path = os.path.join(os.getcwd(),"demo_ttb.py")
-#launch_demo_ttb = subprocess.Popen(f'python3 {ttb_script_path}', stdout=subprocess.DEVNULL, shell=True)
-
 css = """
 .color_btn textarea  {background-color: #228B22; !important}
 """
+
+#print('Waiting for Turtlbot connection...')
+#ttb_script_path = os.path.join(os.getcwd(),"demo_ttb.py")
+#launch_demo_ttb = subprocess.Popen(f'python3 {ttb_script_path}', stdout=subprocess.DEVNULL, shell=True)
+server = DataBridgeServer_TCP()
 
 def transcribe(audio):
     sr, y = audio
@@ -42,52 +42,67 @@ def nlnt (vid_check, prompt, video, history="None", progress=gr.Progress()):
     if vid_check == True:
         return level3_model(prompt, video)
     else:
+        return level2_model(prompt, history, progress=gr.Progress())
 
-        print('sending start')
-        server.send_data('START')
-        print('start sent')
+def level2_model(prompt, history="None", progress=gr.Progress()):
+    
+    progress(0, desc="Starting...")
 
-        history = deque([])
-        state_number = 0
+    server.send_data('START')
+    
+    history = deque([])
+    state_number = 0
         
-        x_dict = {"instruction complete" : "#ongoing"}
-        while x_dict["instruction complete"] == "#ongoing":       # JSON bug here where it doesn't recognize dictionary 
+    x_dict = {"instruction complete" : "#ongoing"}
+    i = 0
+
+    while x_dict["instruction complete"] == "#ongoing":
+        
+        if i != 11:
+            i += 1 
+  
+        if history != deque([]):
+            x = main(prompt, [i for i in history])
+        else:
+            x = main(prompt, "None")
+
+        x_dict = ast.literal_eval(x)
+
+        print('Predicted:', x_dict)
+        lin_x, ang_z = x_dict['movement message']
+        dt = x_dict['execution length']
+        code = 1 if x_dict['instruction complete'] == '#complete' else 0
+
+        progress(i/12, desc=f'Ongoing... Next Action: ({str(lin_x)}, {str(ang_z)}, {str(dt)})')
+
+        mess = str([lin_x, ang_z, dt, code])
+
+        server.send_data(mess.encode())
+        data = ast.literal_eval(server.receive_data().decode())
+
+        x_dict['state number'] = hex(state_number)
+        x_dict['orientation'] = data['orientation']
+
+        if data['blocked']:
+
+            print('============= [WARN] =============')
+            print('block received')
+            print('============= [WARN] =============')
+            server.send_data(str([0.0, 0.0, 0.0, 1]))
+            x_dict['instruction complete'] = '#complete' # finish command
+            break
+
+        history.append(str(x_dict))
+        if len(history) > 5:
+           history.popleft()
             
-            if history != deque([]):
-                x = main(prompt, [i for i in history])
-            else:
-                x = main(prompt, "None")
+        print(history[-1])
+        print('\n')
 
-            x_dict = ast.literal_eval(x)
-
-            print('Predicted:', x_dict)
-            lin_x, ang_z = x_dict['movement message']
-            dt = x_dict['execution length']
-            code = 1 if x_dict['instruction complete'] == '#complete' else 0
-
-            mess = str([lin_x, ang_z, dt, code])
-
-            server.send_data(mess.encode())
-            data = ast.literal_eval(server.receive_data().decode())
-
-            if data['blocked']:
-               print('Obstacle detected.')
-               break
-
-            x_dict['state number'] = hex(state_number)
-            x_dict['orientation'] = data['orientation']
-            #x_dict['distance to next point'] = data['distance_traveled']
-
-            history.append(str(x_dict))
-            if len(history) > 5:
-               history.popleft()
+        state_number += 1
             
-            print(history[-1])
-            print('\n')
-
-            state_number += 1
-            
-        return x
+    progress(1, desc="Movement done!")
+    return "Instruction accomplished. Waiting for next instruction."
 
 def level3_model (prompt, video):
     return "level 3: " + prompt
