@@ -43,15 +43,17 @@ def inference(prompt):
         elapsed_time = end_time - start_time
 
         json_object = response.json()
-        json_formatted_str = json.dumps(json_object, indent=2)
 
+        #print('====================')
+        #print('FORMATTED STR:')
+        #print(json_object['response'])
 
         #json_start = json_formatted_str.rfind('{')
         #json_end = json_formatted_str.rfind('</s>') - 1
 
         #to_return = json_formatted_str[json_start:json_end].replace("'", '"').strip()
         
-        return json_formatted_str
+        return json_object['response']
     
     except requests.RequestException as e:
         print("Error:", e)

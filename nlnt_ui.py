@@ -82,9 +82,9 @@ def nlnt (vid_check, prompt, video, history="None", progress=gr.Progress()):
 
     if vid_check == True:
         #return level3_model(prompt, video)
-        return level2_model(prompt, history, progress=gr.Progress())                            # FOR NOW !!! Change later !!!
+        return level2_model(prompt, progress=gr.Progress())                            # FOR NOW !!! Change later !!!
     else:
-        return level2_model(prompt, history, progress=gr.Progress())
+        return level2_model(prompt, progress=gr.Progress())
 
 def level2_model(user_instruction, progress=gr.Progress()):
     
@@ -96,104 +96,101 @@ def level2_model(user_instruction, progress=gr.Progress()):
 
   while True:
 
+    print('===========================================')
     if first_run:
+        print("First run.")
       # First Iteration
-      prompt = f"""Your task is to pilot a Turtlebot3 and predict the next state give a history sequence. First, predict whether or not the task is doable.
-        The prompt is: <prompt> <PROMPT> </prompt>. Add delimeters to outline your solution and your answer, "<deconstruction_start>" and "<deconstruction_end>" for your step-by-step breakdown of the natural language prompt, and "<possibility_start>" and "<possibility_end>" to delineate your possibility answer and make it easy to parse in Python.
+        prompt = f"""
+Your task is to pilot a Turtlebot3 and predict the next state give a history sequence. First, predict whether or not the task is doable.
+The prompt is: <prompt> <PROMPT> </prompt>. Add delimeters to outline your solution and your answer, "<deconstruction_start>" and "<deconstruction_end>" for your step-by-step breakdown of the natural language prompt, and "<possibility_start>" and "<possibility_end>" to delineate your possibility answer and make it easy to parse in Python.
 
-        Information about the task will be given in JSONs, and it is expected that you will also give your answers in a JSON format.<|end|>"""
-      prompt.replace("<PROMPT>", user_instruction)
-      
-      predicted = inference(prompt)
-      
-      # Check whether or not instruction is possible
-      possible_start = predicted.rfind('<possibility_start>')
-      possible_end = predicted.rfind('<possibility_end>') - 1
+Information about the task will be given in JSONs, and it is expected that you will also give your answers in a JSON format.<|end|>""".strip()
+        
+        prompt = prompt.replace("<PROMPT>", user_instruction)
+        predicted = inference(prompt)
+        
+        # Check whether or not instruction is possible
+        possible_start = predicted.rfind('<possibility_start>')
+        possible_end = predicted.rfind('<possibility_end>') - 1
 
-      possible = predicted[possible_start:possible_end].strip()
+        possible = ast.literal_eval(predicted[possible_start:possible_end].replace("<possibility_start>","").strip())
+        print("CoT response received.")
 
-      if possible:
-        # Instruction is possible
-        prompt += predicted                                                     # add previous prediction to prompt
+        if possible:
 
-        # Get Expected Number of States
-        stepnums_start = predicted.rfind('Thus, it will take ')
-        stepnums_end = predicted.rfind(' states to complete.') - 1
+            # Get Expected Number of States
+            print("Task is possible.")
+            stepnums_start = predicted.rfind('Thus, it will take ')
+            stepnums_end = predicted.rfind(' states to complete.') - 1
+            first_run = False                                                       # first run done!
 
-        stepnums = predicted[stepnums_start:stepnums_end]
-
-        first_run = False                                                       # first run done!
-
-      else:
-        # Instruction is impossible to accomplish
-        return "Task deemed impossible. Waiting for your next instruction."     # stop inferencing here!
+        else:
+            # Instruction is impossible to accomplish
+            return "Task deemed impossible. Waiting for your next instruction."     # stop inferencing here!
 
     else:
-      # Subsequent Inferences once Task is deemed possible
-      x_dict = {"instruction complete" : "#ongoing"}
+        # Subsequent Inferences once Task is deemed possible
+        x_dict = {"instruction complete" : "#ongoing"}
+        current_it = 1
 
-      while x_dict["instruction complete"] == "#ongoing":
-        if state_number != stepnums:
-            status = state_number/stepnums
-        else:
-            status = 0.99
+        while x_dict["instruction complete"] == "#ongoing":
 
-        if history != deque([]):
-            new_prompt = prompt + f"""The current state history is: {[i for i in history]}. Predict the next state. Use "<answer_start>" and "<answer_end>" to delineate the answer.<|end|>"""
-        else:
-            new_prompt = prompt + f"""The current state history is: "None". Predict the next state. Use "<answer_start>" and "<answer_end>" to delineate the answer.<|end|>"""
+            if history != deque([]):
+                new_prompt = predicted + f"""The current state history is: {[i for i in history]}. Predict the next state. Use "<answer_start>" and "<answer_end>" to delineate the answer.<|end|>"""
+            else:
+                new_prompt = predicted + f"""The current state history is: [ None ]. Predict the next state. Use "<answer_start>" and "<answer_end>" to delineate the answer.<|end|>"""
 
-        # Predict the next state
-        predicted = inference(new_prompt)
+            # Predict the next state
+            predicted = inference(new_prompt)
+            # Format the response to make life easier
+            next_state_start = predicted.rfind("<answer_start>")
+            next_state_end = predicted.rfind("<answer_end>") - 1
 
-        # Format the response to make life easier
-        next_state_start = predicted.rfind("<answer_start>")
-        next_state_end = predicted.rfind("<answer_end>") - 1
+            next_state = predicted[next_state_start:next_state_end].replace("<answer_start>","").strip()        
+            x_dict = ast.literal_eval(next_state)
 
-        next_state = predicted[next_state_start:next_state_end].strip()
-
-        print(next_state)
-
-      
-        x_dict = ast.literal_eval(next_state)
-
-        # Send predicted info to Turtlebot
-        print('Predicted:', x_dict)
-        lin_x, ang_z = x_dict['movement message']
-        dt = x_dict['execution length']
-        code = 1 if x_dict['instruction complete'] == '#complete' else 0
-        expected_states = x_dict['expected number of states']               # TODO: double check with actual output
-
-        progress(status, desc=f'Ongoing... Next Action: ({str(lin_x)}, {str(ang_z)}, {str(dt)})')
-
-        mess = str([lin_x, ang_z, dt, code])
-
-        server.send_data(mess.encode())                                     # send the predicted action to turtlebot
-        data = ast.literal_eval(server.receive_data().decode())             # receive actual action from turtlebot
-
-        x_dict['state number'] = hex(state_number)
-        x_dict['orientation'] = data['orientation']
-
-        if data['blocked']:
-
-            print('============= [WARN] =============')
-            print('block received')
-            print('============= [WARN] =============')
-            server.send_data(str([0.0, 0.0, 0.0, 1]))
-            x_dict['instruction complete'] = '#complete' # finish command
-            break
-
-        history.append(str(x_dict))
-        if len(history) > 5:
-            history.popleft()
+            # Send predicted info to Turtlebot
+            print('Predicted:', x_dict)
+            lin_x, ang_z = x_dict['twist message']
+            dt = x_dict['execution length']
+            code = 1 if x_dict['instruction complete'] == '#complete' else 0
+            expected_states = x_dict['total states']
             
-        print(history[-1])
-        print('\n')
-        
-        state_number += 1
+            progress_status = current_it / (int(str(expected_states),16)+1)
+
+            progress(progress_status, desc=f'Ongoing... Next Action: ({str(lin_x)}, {str(ang_z)}, {str(dt)})')
+
+            mess = str([lin_x, ang_z, dt, code])
+
+            print("Sending:", mess)
+            server.send_data(mess.encode())                                     # send the predicted action to turtlebot
+            print('------')
+            print("Waiting on Turtlebot reply...")
+            data = ast.literal_eval(server.receive_data().decode())             # receive actual action from turtlebot
+
+            x_dict['state number'] = hex(state_number)
+            x_dict['orientation'] = data['orientation']
+
+            if data['blocked']:
+
+                print('============= [WARN] =============')
+                print('block received')
+                print('============= [WARN] =============')
+                server.send_data(str([0.0, 0.0, 0.0, 1]))
+                x_dict['instruction complete'] = '#complete' # finish command
+                break
+
+            history.append(str(x_dict))
+            if len(history) > 5:
+                history.popleft()
+                
+            print(history[-1])
+            print('\n')
             
-    progress(1, desc="Movement done!")
-    return "Instruction accomplished. Waiting for next instruction."
+            state_number += 1
+                
+        progress(1, desc="Movement done!")
+        return "Instruction accomplished. Waiting for next instruction."
 
 def level3_model (prompt, video):
     return "level 3: " + prompt
@@ -286,12 +283,12 @@ with gr.Blocks(theme=theme, css=css, title = "NLNT Demo",js="metadata.js") as de
         </div>
         """)
 
-
-
 ### add webserver to host data from turtlebot
 from fastapi import FastAPI
 from random import randrange
 
+demo.launch()
+"""
 webserver = FastAPI()
 print("launching webserver")
 
@@ -301,6 +298,7 @@ def read_root():
 
 
 @webserver.get("/metadata")
+
 def read_metadata():
     # TODO, format the data from server = DataBridgeServer_TCP() to get the different metadata
     total_distance_traveled = randrange(20, 50)
@@ -308,3 +306,4 @@ def read_metadata():
     return {"total_distance_traveled": total_distance_traveled, "total_degrees_rotated": total_degrees_rotated}
 
 app = gr.mount_gradio_app(webserver, demo, path="/")
+"""
