@@ -107,10 +107,12 @@ class AutoDataCollector(Node):
         self.odometry_msg = None
 
         self.client = DataBridgeClient_TCP(destination_ip_address=args.ip, destination_port=50000)
+        time.sleep(1) # allow server to open port 15000
+        self.json_transmitter = DataBridgeClient_TCP(destination_ip_address=args.ip,destination_port=15000)
 
         self.twist_timestamp = None
         self.last_twist_timestamp = None
-        self.collect_data = False
+        self.collect_data = True
         self.data_frame_buffer = []
         self.laserscan_msg = None
 
@@ -126,17 +128,19 @@ class AutoDataCollector(Node):
         self.front_is_blocked = False
 
         # multithreading stuff
-        if sampler_on:
-        
-            self.transmitter = threading.Thread(target=self.sampling_process) # sends data to controller
-            self.transmitter.daemon = True
-            self.transmitter.start()
+        self.transmitter = threading.Thread(target=self.sampling_process) # sends data to controller
+        self.transmitter.daemon = True
+        self.transmitter.start()
 
         if comm_on:
         
             self.controller = threading.Thread(target=self.communicator)      # receives instructions from controller
             self.controller.daemon = True
             self.controller.start()
+
+        # super json transmitter
+        self.super_json_broadcaster = threading.Thread(target=self.json_uplink)
+        self.super_json_broadcaster.start()
 
         # soft barrier checker
         self.barrier_thread = threading.Thread(target=self.soft_barrier)
@@ -145,6 +149,23 @@ class AutoDataCollector(Node):
         # asynchronously handles movement
         self.movement_handler_thread = threading.Thread(target=self.movement_server)
         self.movement_handler_thread.start()
+
+    def json_uplink(self):
+
+        while self.super_json == None:
+            print("Waiting for super json...")
+            time.sleep(1)
+
+        wait_time = 1/args.sampling_hz * 0.5 # super json nyquist frequency
+
+        while True:
+            
+            if self.super_json == None: # wait until new super json is available
+                time.sleep(wait_time)
+
+            data = str(self.super_json).encode("utf-8")
+            self.json_transmitter.send_data(data)
+            self.super_json = None # set as none to prevent sending duplicates
 
     def laserscan_callback(self, msg):
         if msg == None: return
@@ -162,17 +183,25 @@ class AutoDataCollector(Node):
     def sampling_process(self):
         
         # wait for the msgs to reead
-        while self.imu_msg == None: time.sleep(0.1)
-        while self.odometry_msg_data == None: time.sleep(0.1)
-        while self.odometry_msg_data_pos == None: time.sleep(0.1)
-        while self.odometry_msg == None: time.sleep(0.1)
+        while self.imu_msg == None: 
+            print("waiting for imu msg...")
+            time.sleep(0.1)
+        while self.odometry_msg_data == None:
+            print("waiting for odetry msg data...")
+            time.sleep(0.1)
+        while self.odometry_msg_data_pos == None: 
+            print("waiting for odometry pos...")
+            time.sleep(0.1)
+        while self.odometry_msg == None: 
+            print("waiting for odometry msg...")
+            time.sleep(0.1)
 
         twist_msg_jsonized = { # default
                     "linear":(0.0, 0.0, 0.0),
                     "angular":(0.0, 0.0, 0.0),
                     "time":self.twist_msg
                 }
-        
+    
         self.sampling_start = True # unlocks data collection to ensure that there is data from the sensors
         while True:
            
@@ -214,8 +243,7 @@ class AutoDataCollector(Node):
             "laser_scan" : None, "twist":twist_msg_jsonized, "imu":imu_msg_jsonized, 
             "odometry":odometry_msg_jsonized, "battery":None, "frame_data":None, "distance_traveled":self.distance_traveled, "radians_rotated":self.radians_rotated
             }
-            
-            self.data_frame_buffer.append(self.super_json)
+
             time.sleep(1/args.sampling_hz)
             
     def communicator(self):
@@ -277,6 +305,7 @@ class AutoDataCollector(Node):
                 distance = compute_distance(self.odometry_msg_data_pos, ins_start_pos)
                 ins_end_orientation = quart_funcs.adjust_orientation_origin(normalizing_quat,self.odometry_msg_data)
                 print("Blocked:",self.front_is_blocked, '|',self.direction)
+                
                 return_data = str(
 
                     {
