@@ -64,8 +64,12 @@ p {
 # ttb_script_path = os.path.join(os.getcwd(),"demo_ttb.py")
 # launch_demo_ttb = subprocess.Popen(f'python3 {ttb_script_path}', stdout=subprocess.DEVNULL, shell=True)
 server = DataBridgeServer_TCP()
+json_listener = DataBridgeServer_TCP(port_number=15000)
+latest_super_json = None
+
 print(server)
 def transcribe(audio):
+
     sr, y = audio
     y = y.astype(np.float32)
     y /= np.max(np.abs(y))
@@ -91,6 +95,7 @@ def level2_model(user_instruction, progress=gr.Progress()):
   state_number = 0
 
   while True:
+
     if first_run:
       # First Iteration
       prompt = f"""Your task is to pilot a Turtlebot3 and predict the next state give a history sequence. First, predict whether or not the task is doable.
@@ -185,7 +190,6 @@ def level2_model(user_instruction, progress=gr.Progress()):
         print(history[-1])
         print('\n')
         
-
         state_number += 1
             
     progress(1, desc="Movement done!")
@@ -216,29 +220,22 @@ def total_rotation():
    
     return time.ctime()
 
-data_buffer = []
-
 def super_json_listener():
 
         t = time.time() + 1.0
         x = 0
-        gathering_data = True
 
         while True:
-            
-            if not gathering_data: time.sleep(0.007); continue
 
             if time.time() > t:  # used to calculate framerate for debug purposes
                 t = time.time() + 1.0
                 x = 0
             x += 1
 
-            data = json.loads(server.receive_data().decode())
-            if data_buffer == None: print("WARNING: data buffer is still None type."); continue
+            data = ast.literal_eval(json_listener.receive_data().decode())
 
+            latest_super_json = data
             
-            data_buffer.append(data)
-
 import threading
 data_listener_thread = threading.Thread(target=super_json_listener)
 data_listener_thread.start()

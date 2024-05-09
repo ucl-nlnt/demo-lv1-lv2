@@ -18,7 +18,7 @@ def inference(prompt):
     if prompt is None:
         prompt = input(chalk.yellow("Enter your prompt: "))
 
-'''
+    '''
     # TODO: format prompt
 
     if history == "None":
@@ -29,7 +29,7 @@ def inference(prompt):
     print('================================================')
     print(prompt)
     print('================================================')
-''' 
+    ''' 
     headers = {'Content-Type': 'application/json'}
     data = {'content': prompt}
 
