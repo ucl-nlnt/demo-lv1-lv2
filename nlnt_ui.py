@@ -383,9 +383,9 @@ with gr.Blocks(theme=theme, css=css, title = "NLNT Demo",js="metadata.js", head=
             status = gr.Textbox(label = "Status", placeholder = "Please enter your prompt.")
             #history = None
             run_nlnt = ttbt_btn.click(fn=nlnt, inputs=[vid_check, prompt, video], outputs=status)
-    with gr.Row():
+    #with gr.Row():
         #deconstruct_btn = gr.Button(value = "Show Prompt Breakdown")
-        prompt_breakdown = gr.Textbox(label = "Prompt Breakdown", value = read_metadata(), interactive = False, every = 1)
+    #    prompt_breakdown = gr.Textbox(label = "Prompt Breakdown", value = read_metadata(), interactive = False, every = 1)
         #run_prompt_brd = deconstruct_btn.click(fn = deconstruct(), inputs = [], outputs = prompt_breakdown)
     #with gr.Row():
     #    total_dist = gr.Textbox(value = next(total_distance()), label = "Total Distance Traveled", interactive=False)
