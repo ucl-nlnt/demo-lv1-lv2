@@ -237,6 +237,7 @@ class AutoDataCollector(Node):
                     "time":self.twist_timestamp
                 }
 
+            #if self.battery
             # if need laser scan data, will add in the future
             
             self.super_json = { 
@@ -300,22 +301,11 @@ class AutoDataCollector(Node):
                 print('Delta t done.', dt, round(time.time() - t,3))
                 self.direction = None
 
-                time.sleep(0.5) # allow for deceleration
+                time.sleep(1.0) # allow for deceleration
 
                 distance = compute_distance(self.odometry_msg_data_pos, ins_start_pos)
                 ins_end_orientation = quart_funcs.adjust_orientation_origin(normalizing_quat,self.odometry_msg_data)
                 print("Blocked:",self.front_is_blocked, '|',self.direction)
-                
-                return_data = str(
-
-                    {
-                        'orientation': round(quaternion_to_yaw(*ins_end_orientation),precision),
-                        'distance_traveled': round(distance,precision),
-                        'blocked' : 1 if self.front_is_blocked and last_direction == 'forward' else 0
-                    }
-
-                )
-                
                 delta_yaw = yaw_difference(quaternion1=ins_start_orientation, quaternion2=ins_end_orientation)
                 total_instruction_distance += distance
                 total_rotation_angular_distance += delta_yaw
@@ -323,6 +313,18 @@ class AutoDataCollector(Node):
                 print(f'Current iteration angular distance: {round(delta_yaw / math.pi * 180,3)} degrees | {round(delta_yaw,3)} radians.') 
                 print('Total distance traveled:', round(total_instruction_distance,3))
                 print(f'Total orientation difference: {round(total_rotation_angular_distance / math.pi * 180,3)} degrees | {round(total_rotation_angular_distance,3)} radians.')
+                
+                return_data = str(
+
+                    {
+                        'orientation': round(quaternion_to_yaw(*ins_end_orientation),precision),
+                        'distance_traveled': round(distance,precision),
+                        'orientation_diff': round(total_rotation_angular_distance / math.pi * 180,3),
+                        'blocked' : 1 if self.front_is_blocked and last_direction == 'forward' else 0
+                    }
+
+                )
+                
                 print('return data:', return_data)
                 print('\n')
                 self.client.send_data(return_data.encode())
@@ -355,7 +357,6 @@ class AutoDataCollector(Node):
 
             degrees_blocked = 0
 #            print('==========================')
-
             for i, val in enumerate(scans):
 
                 if (i > 45 and i < 314): 
@@ -367,7 +368,6 @@ class AutoDataCollector(Node):
 #                    print(i, val)
 
                     if degrees_blocked >= 5:
-
                         self.front_is_blocked = True
                         break # no need to iterate through other values
 
