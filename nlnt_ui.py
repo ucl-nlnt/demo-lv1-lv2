@@ -404,9 +404,9 @@ with gr.Blocks(theme=theme, css=css, title = "NLNT Demo",js="metadata.js", head=
                     <span style='font-weight:bold;'>Battery Percentage:</span> <span id="batt">100%</span>
                 </div>
             </div>
-            <div style='display: flex; flex-direction: column;'>
+            <div style='display: flex; flex-direction: column; padding: 5px; background-color: #292524;'>
                 <span style='font-weight:bold;display:flex;justify-content:start;'>Prompt Breakdown:</span> 
-                <span id="prompt">0</span>
+                <span id="prompt" style='background-color: #44403C; padding: 5px;'>0</span>
             </div>
         </div>
         """)
