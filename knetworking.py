@@ -241,6 +241,7 @@ class DataBridgeServer_TCP:
         self.enable_acks = enable_acks
         self.debug = debug
         self.packet_size = packet_size
+        
         # TURN OFF TO DISABLE RANDOM ERRORS
         self.simulate_errors = False
         self.client = None
