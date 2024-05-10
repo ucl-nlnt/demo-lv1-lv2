@@ -5,7 +5,7 @@
 ### Terminal Commands
 1. On Gradio PC
 ```bash
-fastapi dev nlnt_ui.py
+python3 nlnt_ui.py
 ``` 
 
 2. On Turtlebot
