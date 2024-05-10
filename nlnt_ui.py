@@ -338,9 +338,10 @@ with gr.Blocks(theme=theme, css=css, title = "NLNT Demo",js="metadata.js") as de
                  <div>
                     <span style='font-weight:bold;'>Battery Percentage:</span> <span id="batt">100%</span>
                 </div>
-                <div>
-                    <span style='font-weight:bold;'>Prompt Breakdown:</span> <span id="prompt">0</span>
-                </div>
+            </div>
+            <div style='display: flex; flex-direction: column;'>
+                <span style='font-weight:bold;display:flex;justify-content:start;'>Prompt Breakdown:</span> 
+                <span id="prompt">0</span>
             </div>
         </div>
         """)
@@ -378,4 +379,4 @@ app = gr.mount_gradio_app(webserver, demo, path="/")
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1",port=8000)
+    uvicorn.run(app, host="127.0.0.1",port=8000,log_level="critical")
