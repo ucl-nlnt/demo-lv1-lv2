@@ -93,7 +93,7 @@ class AutoDataCollector(Node):
         super().__init__('ttb_demo')
         self.movement_publisher = self.create_publisher(Twist, '/cmd_vel',10)
         self.create_subscription(LaserScan, 'scan', self.laserscan_callback, qos_profile_sensor_data)
-        self.create_subscription(Odometry, 'odom', self.odometer_callback, qos_profile_sensor_data)  
+        self.create_subscription(Odometry, 'odom', self.odometer_callback, qos_profile_sensor_data)
         self.create_subscription(Twist,'cmd_vel', self.twist_callback, qos_profile_sensor_data)
         self.create_subscription(Imu,'imu', self.imu_callback, qos_profile_sensor_data) # IMU data doesn't seem to be useful currently // Gab
 
@@ -237,7 +237,9 @@ class AutoDataCollector(Node):
                     "time":self.twist_timestamp
                 }
 
-            #if self.battery
+            #if self.battery:
+                
+
             # if need laser scan data, will add in the future
             
             self.super_json = { 
@@ -405,9 +407,6 @@ class AutoDataCollector(Node):
     def print_log(self, mess:str):
 
         print(f"[AutoDataCollector: {time.ctime()}] " + mess)
-
-    
-    #def battery(self):
     
     def movement_server(self):
 

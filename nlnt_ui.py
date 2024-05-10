@@ -392,7 +392,15 @@ with gr.Blocks(theme=theme, css=css, title = "NLNT Demo",js="metadata.js", head=
     #    total_rot = gr.Textbox(value = total_rotation(), label = "Total Degrees Rotated", interactive=False, every=0.5)
     with gr.Row():
         gr.HTML("""
-        <div style='display: flex; flex-direction: column; height: 100px; width: 100%;'>
+        <div style='display: flex; flex-direction: column; height: auto; width: 100%;'>
+            <div style='display: flex; flex-direction: column; padding: 20px; background-color: #292524;'>
+                <span style='font-weight:bold;display:flex;justify-content:start;'>Prompt Breakdown</span> 
+                <span id="prompt" style='background-color: #44403C; padding: 20px;margin-top: 20px'>0</span>
+            </div>
+        </div>
+        <br>
+        <br>
+        <div style='display: flex; flex-direction: column; height: auto; width: 100%;'>
             <div style='display:flex;justify-content:space-around;'>
                 <div>
                     <span style='font-weight:bold;'>Total Distance Traveled:</span> <span id="total-dist">0</span>
@@ -403,10 +411,7 @@ with gr.Blocks(theme=theme, css=css, title = "NLNT Demo",js="metadata.js", head=
                  <div>
                     <span style='font-weight:bold;'>Battery Percentage:</span> <span id="batt">100%</span>
                 </div>
-            </div>
-            <div style='display: flex; flex-direction: column; padding: 5px; background-color: #292524;'>
-                <span style='font-weight:bold;display:flex;justify-content:start;'>Prompt Breakdown:</span> 
-                <span id="prompt" style='background-color: #44403C; padding: 5px;'>0</span>
+
             </div>
         </div>
         """)
