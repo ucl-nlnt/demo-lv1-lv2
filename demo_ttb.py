@@ -407,6 +407,8 @@ class AutoDataCollector(Node):
         print(f"[AutoDataCollector: {time.ctime()}] " + mess)
 
     
+    def battery(self):
+    
     def movement_server(self):
 
         data = Twist()
