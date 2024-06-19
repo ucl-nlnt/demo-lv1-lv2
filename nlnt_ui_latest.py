@@ -343,9 +343,7 @@ print("launching webserver")
 def read_root():
     return {"Hello": "World"}
 
-
 @webserver.get("/metadata")
-
 def read_metadata():
 
     global total_distance, total_rotation, deconstruction
@@ -432,6 +430,8 @@ with gr.Blocks(theme=theme, css=css, title = "NLNT Demo",js="metadata.js", head=
 
 app = gr.mount_gradio_app(webserver, demo, path="/")
 
+"""
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="127.0.0.1",port=8001,log_level="critical")
+"""
