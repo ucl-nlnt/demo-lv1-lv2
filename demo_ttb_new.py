@@ -317,19 +317,21 @@ class AutoDataCollector(Node):
                 end_orientation = quart_funcs.adjust_orientation_origin(normalizing_quat,self.odometry_msg_data)
                 angular_distance = yaw_difference(starting_orientation, end_orientation)
                 total_rotation_angular_distance += abs(angular_distance)
-
+                print(total_rotation_angular_distance, angular_distance)
                 return_data = str(
 
                     {
-                        'orientation': round(end_orientation,precision),
+                        'orientation': round(quaternion_to_yaw(*end_orientation),precision),
                         'total distance' : round(total_instruction_distance,precision),
                         'total angular distance' : round(total_rotation_angular_distance,precision),
                         'distance_traveled': round(distance,precision),
-                        'orientation_diff': round(orientation_diff / math.pi * 180,3),
+                        'orientation_diff': round(angular_distance / math.pi * 180,3),
                         'blocked' : 1 if self.front_is_blocked and last_direction == 'forward' else 0
                     }
 
                 )
+
+                self.client.send_data(return_data)
                 
     def soft_barrier(self):
 

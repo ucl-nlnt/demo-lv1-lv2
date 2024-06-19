@@ -189,6 +189,7 @@ The natural language prompt that I want you to break-down is: {prompt}<|end|>
     breakdown = inference(for_breakdown)
     
     prompt_analysis = breakdown[breakdown.rfind('<explanation_start>') + len('<explanation_start>'):breakdown.rfind('<explanation_end>')]
+    
     if prompt_analysis.rfind('### Possibility: True') == -1:
 
         return {"possibility" : False, "breakdown" : None}
@@ -245,12 +246,13 @@ def level2_model(user_instruction, progress=gr.Progress()):
 
         reply = generate_breakdown(user_instruction)
         possibility, prompt_breakdown = reply['possibility'], reply['breakdown']
-
+        
         if not possibility:
             breakdown = prompt_breakdown
+            print("Task deemed impossible.")
             return "Task deemed impossible"
 
-        while state_number_total < max_num_states:
+        while state_number <= max_num_states:
 
             if len(history) == 0:
 
@@ -265,20 +267,21 @@ def level2_model(user_instruction, progress=gr.Progress()):
                 todo = ast.literal_eval(predict_next_state(user_instruction, prompt_breakdown, list(history), state_number))
                 history.append(todo)
 
-            state_number += 1
+            print(todo)
             instruction = str([todo['twist message'], todo['execution length'], False])
             server.send_data(instruction)
-            received = server.receive_data().decode()
-            print(received)
-
-            if state_number >= max_num_states:
-
+            received = ast.literal_eval(server.receive_data().decode())
+            print(received['total distance'], received['distance_traveled'])
+            if state_number >= max_num_states or received['blocked']:
+    
                 instruction = str([[0.0, 0.0], 0.0, True])
                 server.send_data(instruction)
-
+                print(received)
+                print("Instruction accomplished. Waiting for next instruction.")
                 return "Instruction accomplished. Waiting for next instruction."
 
             if len(history) > 5: history.popleft() # keep history at depth = 5
+            state_number += 1
 
 
 def level3_model (prompt, video):
